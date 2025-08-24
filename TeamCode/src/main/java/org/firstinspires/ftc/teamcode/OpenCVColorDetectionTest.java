@@ -58,7 +58,6 @@ public class OpenCVColorDetectionTest extends LinearOpMode {
     }
     class CustomizedPipeline extends OpenCvPipeline {
 
-        Mat YCbCr = new Mat();
         Mat leftCrop;
         Mat rightCrop;
         double leftavgfin;
@@ -67,28 +66,43 @@ public class OpenCVColorDetectionTest extends LinearOpMode {
         Scalar rectColor = new Scalar(255, 0 , 0);
 
         //The SDK calls this method for every frame to get the Matrix
+        @Override
         public Mat processFrame(Mat input){
-            Imgproc.cvtColor(input, YCbCr, Imgproc.COLOR_RGB2YCrCb);
+            input.copyTo(output);
+            //Convert to YCbCr
+            Imgproc.cvtColor(output, output, Imgproc.COLOR_RGB2YCrCb);
 
             Rect leftRect = new Rect (1, 1, CAMERA_WIDTH/2 - 1, CAMERA_HEIGHT - 1);
             Rect rightRect = new Rect(CAMERA_WIDTH/2, 1, CAMERA_WIDTH/2 - 1, CAMERA_HEIGHT - 1);
 
-            input.copyTo(output);
+            //Draw rectangles on camera stream
             Imgproc.rectangle(output, leftRect, rectColor, 2);
             Imgproc.rectangle(output, rightRect, rectColor, 2);
 
-            leftCrop = YCbCr.submat(leftRect);
-            rightCrop = YCbCr.submat(rightRect);
+            //Split stream into two based on rectangles
+            leftCrop = output.submat(leftRect);
+            rightCrop = output.submat(rightRect);
 
-            Core.extractChannel(leftCrop, leftCrop, 2);
-            Core.extractChannel(rightCrop, rightCrop, 2);
+            //Extract the Cr channel, Y, Cr, Cb (red is 240 in Cr).
+            Core.extractChannel(leftCrop, leftCrop, 1);
+            Core.extractChannel(rightCrop, rightCrop, 1);
 
+            //Average value of pixels in each side of camera stream
             Scalar leftavg = Core.mean(leftCrop);
             Scalar rightavg = Core.mean(rightCrop);
 
+            leftCrop.release();
+            rightCrop.release();
+
+            //Take the first value of scalar if extracting, scalars divided up into Y,Cr, Cb
+            //When extracting the Cr channel there is only one value in the scalar array
             leftavgfin = leftavg.val[0];
             rightavgfin = rightavg.val[0];
+            //Implementation when not extracting from scalars
+            //leftavgfin = leftavg.val[1];
+            //rightavgfin = rightavg.val[1];
 
+            //Telemetry output
             telemetry.addData("leftavg", leftavgfin);
             telemetry.addData("rightavg", rightavgfin);
             if(leftavgfin > rightavgfin){
